@@ -321,6 +321,7 @@ VOICE_LIBRARY_DIR=./voices
 DEVICE=auto               # auto/cuda/mps/cpu
 MODEL_CACHE_DIR=./models
 MODEL_ID=                 # Override model repo ID
+MODEL_VARIANT=auto        # Force model variant (auto/default/turbo)
 ```
 
 ### Parameter Effects

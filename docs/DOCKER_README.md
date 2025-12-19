@@ -153,6 +153,7 @@ nano .env  # or your preferred editor
 | `VOICE_LIBRARY_DIR` | `/voices`            | Directory for voice library     |
 | `DEVICE`            | `auto`               | Device: auto/cuda/mps/cpu       |
 | `MODEL_ID`          | ``                   | Override model repo ID          |
+| `MODEL_VARIANT`     | `auto`               | Force model variant             |
 | `MAX_CHUNK_LENGTH`  | `280`                | Max characters per chunk        |
 
 ### Voice Configuration

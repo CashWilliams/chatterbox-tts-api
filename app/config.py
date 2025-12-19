@@ -31,6 +31,7 @@ class Config:
     DEVICE_OVERRIDE = os.getenv('DEVICE', 'auto')
     MODEL_CACHE_DIR = os.getenv('MODEL_CACHE_DIR', './models')
     MODEL_ID = os.getenv('MODEL_ID', '')
+    MODEL_VARIANT = os.getenv('MODEL_VARIANT', 'auto')
     
     # Voice library settings
     VOICE_LIBRARY_DIR = os.getenv('VOICE_LIBRARY_DIR', './voices')

@@ -5,6 +5,7 @@ TTS model initialization and management
 import os
 import asyncio
 import inspect
+import importlib
 from enum import Enum
 from typing import Optional, Dict, Any
 from chatterbox.tts import ChatterboxTTS
@@ -21,6 +22,7 @@ _initialization_progress = ""
 _is_multilingual = None
 _supported_languages = {}
 _model_id = None
+_model_variant = None
 
 
 class InitializationState(Enum):
@@ -32,7 +34,7 @@ class InitializationState(Enum):
 
 async def initialize_model():
     """Initialize the Chatterbox TTS model"""
-    global _model, _device, _initialization_state, _initialization_error, _initialization_progress, _is_multilingual, _supported_languages, _model_id
+    global _model, _device, _initialization_state, _initialization_error, _initialization_progress, _is_multilingual, _supported_languages, _model_id, _model_variant
     
     try:
         _initialization_state = InitializationState.INITIALIZING.value
@@ -48,9 +50,13 @@ async def initialize_model():
 
         model_id = Config.MODEL_ID.strip() if Config.MODEL_ID else ""
         model_id = model_id or None
+        model_variant = _resolve_model_variant(model_id)
         _model_id = model_id or "default"
+        _model_variant = model_variant
         if model_id:
             print(f"Model ID override: {model_id}")
+        if model_variant != "default":
+            print(f"Model variant: {model_variant}")
         
         _initialization_progress = "Creating model cache directory..."
         # Ensure model cache directory exists
@@ -91,10 +97,26 @@ async def initialize_model():
         use_multilingual = Config.USE_MULTILINGUAL_MODEL
         
         _initialization_progress = "Loading TTS model (this may take a while)..."
+        _patch_perth_watermarker()
         # Initialize model with run_in_executor for non-blocking
         loop = asyncio.get_event_loop()
         
-        if use_multilingual:
+        if model_variant == "turbo":
+            if use_multilingual:
+                print("⚠ Turbo model does not support multilingual mode; forcing standard model settings.")
+                use_multilingual = False
+            print("Loading Chatterbox Turbo TTS model...")
+            turbo_cls = _get_turbo_class()
+            model_kwargs = _build_pretrained_kwargs(turbo_cls, model_id)
+            model_kwargs["device"] = _device
+            _model = await loop.run_in_executor(
+                None,
+                lambda: turbo_cls.from_pretrained(**model_kwargs)
+            )
+            _is_multilingual = False
+            _supported_languages = {"en": "English"}
+            print("✓ Turbo model initialized (English only)")
+        elif use_multilingual:
             print(f"Loading Chatterbox Multilingual TTS model...")
             model_kwargs = _build_pretrained_kwargs(ChatterboxMultilingualTTS, model_id)
             model_kwargs["device"] = _device
@@ -142,6 +164,13 @@ def get_model_id():
         return _model_id
     config_model_id = Config.MODEL_ID.strip() if Config.MODEL_ID else ""
     return config_model_id or "default"
+
+
+def get_model_variant():
+    """Get the current model variant"""
+    if _model_variant:
+        return _model_variant
+    return _resolve_model_variant(get_model_id())
 
 
 def get_device():
@@ -198,6 +227,7 @@ def get_model_info() -> Dict[str, Any]:
         "language_count": len(_supported_languages),
         "device": _device,
         "model_id": _model_id,
+        "model_variant": _model_variant,
         "is_ready": is_ready(),
         "initialization_state": _initialization_state
     }
@@ -218,8 +248,59 @@ def _build_pretrained_kwargs(model_cls, model_id: Optional[str]) -> Dict[str, An
     ):
         return {"model_id": model_id}
 
+    if _apply_model_id_override(model_cls, model_id):
+        print(f"Model repo override applied via module REPO_ID: {model_id}")
+        return {}
+
     print(
         "⚠ Model ID override is set but this chatterbox-tts version "
-        "does not accept a model ID; using default weights."
+        "does not accept a model ID or REPO_ID override; using default weights."
     )
     return {}
+
+
+def _apply_model_id_override(model_cls, model_id: str) -> bool:
+    try:
+        module = importlib.import_module(model_cls.__module__)
+    except Exception:
+        return False
+
+    if hasattr(module, "REPO_ID"):
+        setattr(module, "REPO_ID", model_id)
+        return True
+
+    return False
+
+
+def _patch_perth_watermarker() -> None:
+    try:
+        import perth
+    except Exception:
+        return
+
+    if getattr(perth, "PerthImplicitWatermarker", None) is None:
+        perth.PerthImplicitWatermarker = getattr(perth, "DummyWatermarker", None)
+        print("⚠ Perth watermarker not available; falling back to DummyWatermarker.")
+
+
+def _resolve_model_variant(model_id: Optional[str]) -> str:
+    config_variant = (Config.MODEL_VARIANT or "").strip().lower()
+    if config_variant and config_variant != "auto":
+        return config_variant
+
+    if model_id and "turbo" in model_id.lower():
+        return "turbo"
+
+    return "default"
+
+
+def _get_turbo_class():
+    try:
+        from chatterbox.tts_turbo import ChatterboxTurboTTS
+    except ImportError as exc:
+        raise ImportError(
+            "ChatterboxTurboTTS is not available in this chatterbox-tts install. "
+            "Install the Turbo-capable version of chatterbox-tts to use MODEL_ID with turbo."
+        ) from exc
+
+    return ChatterboxTurboTTS

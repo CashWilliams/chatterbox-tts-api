@@ -593,6 +593,7 @@ Key environment variables (see the example files for full list):
 | `VOICE_SAMPLE_PATH`      | `./voice-sample.mp3` | Voice sample for cloning       |
 | `DEVICE`                 | `auto`               | Device (auto/cuda/mps/cpu)     |
 | `MODEL_ID`               | ``                   | Override model repo ID         |
+| `MODEL_VARIANT`          | `auto`               | Force model variant            |
 
 <details>
 <summary><strong>🎭 Voice Cloning</strong></summary>
@@ -930,6 +931,11 @@ echo "MAX_CHUNK_LENGTH=200" >> .env
 **Model download fails**
 
 ```bash
+# Authenticate with Hugging Face if the model is gated or private
+hf auth login
+# If you're using uv:
+uv run hf auth login
+
 # Clear cache and retry
 rm -rf models/
 uvicorn app.main:app --host 0.0.0.0 --port 4123  # or: uv run main.py
