@@ -30,6 +30,7 @@ class Config:
     VOICE_SAMPLE_PATH = os.getenv('VOICE_SAMPLE_PATH', './voice-sample.mp3')
     DEVICE_OVERRIDE = os.getenv('DEVICE', 'auto')
     MODEL_CACHE_DIR = os.getenv('MODEL_CACHE_DIR', './models')
+    MODEL_ID = os.getenv('MODEL_ID', '')
     
     # Voice library settings
     VOICE_LIBRARY_DIR = os.getenv('VOICE_LIBRARY_DIR', './voices')

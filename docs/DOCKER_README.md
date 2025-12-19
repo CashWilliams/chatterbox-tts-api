@@ -152,6 +152,7 @@ nano .env  # or your preferred editor
 | `VOICE_SAMPLE_PATH` | `./voice-sample.mp3` | Path to voice sample            |
 | `VOICE_LIBRARY_DIR` | `/voices`            | Directory for voice library     |
 | `DEVICE`            | `auto`               | Device: auto/cuda/mps/cpu       |
+| `MODEL_ID`          | ``                   | Override model repo ID          |
 | `MAX_CHUNK_LENGTH`  | `280`                | Max characters per chunk        |
 
 ### Voice Configuration

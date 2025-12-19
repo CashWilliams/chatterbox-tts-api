@@ -4,6 +4,7 @@ TTS model initialization and management
 
 import os
 import asyncio
+import inspect
 from enum import Enum
 from typing import Optional, Dict, Any
 from chatterbox.tts import ChatterboxTTS
@@ -19,6 +20,7 @@ _initialization_error = None
 _initialization_progress = ""
 _is_multilingual = None
 _supported_languages = {}
+_model_id = None
 
 
 class InitializationState(Enum):
@@ -30,7 +32,7 @@ class InitializationState(Enum):
 
 async def initialize_model():
     """Initialize the Chatterbox TTS model"""
-    global _model, _device, _initialization_state, _initialization_error, _initialization_progress, _is_multilingual, _supported_languages
+    global _model, _device, _initialization_state, _initialization_error, _initialization_progress, _is_multilingual, _supported_languages, _model_id
     
     try:
         _initialization_state = InitializationState.INITIALIZING.value
@@ -43,6 +45,12 @@ async def initialize_model():
         print(f"Device: {_device}")
         print(f"Voice sample: {Config.VOICE_SAMPLE_PATH}")
         print(f"Model cache: {Config.MODEL_CACHE_DIR}")
+
+        model_id = Config.MODEL_ID.strip() if Config.MODEL_ID else ""
+        model_id = model_id or None
+        _model_id = model_id or "default"
+        if model_id:
+            print(f"Model ID override: {model_id}")
         
         _initialization_progress = "Creating model cache directory..."
         # Ensure model cache directory exists
@@ -88,18 +96,22 @@ async def initialize_model():
         
         if use_multilingual:
             print(f"Loading Chatterbox Multilingual TTS model...")
+            model_kwargs = _build_pretrained_kwargs(ChatterboxMultilingualTTS, model_id)
+            model_kwargs["device"] = _device
             _model = await loop.run_in_executor(
                 None, 
-                lambda: ChatterboxMultilingualTTS.from_pretrained(device=_device)
+                lambda: ChatterboxMultilingualTTS.from_pretrained(**model_kwargs)
             )
             _is_multilingual = True
             _supported_languages = SUPPORTED_LANGUAGES.copy()
             print(f"✓ Multilingual model initialized with {len(_supported_languages)} languages")
         else:
             print(f"Loading standard Chatterbox TTS model...")
+            model_kwargs = _build_pretrained_kwargs(ChatterboxTTS, model_id)
+            model_kwargs["device"] = _device
             _model = await loop.run_in_executor(
                 None, 
-                lambda: ChatterboxTTS.from_pretrained(device=_device)
+                lambda: ChatterboxTTS.from_pretrained(**model_kwargs)
             )
             _is_multilingual = False
             _supported_languages = {"en": "English"}  # Standard model only supports English
@@ -122,6 +134,14 @@ async def initialize_model():
 def get_model():
     """Get the current model instance"""
     return _model
+
+
+def get_model_id():
+    """Get the current model ID"""
+    if _model_id:
+        return _model_id
+    config_model_id = Config.MODEL_ID.strip() if Config.MODEL_ID else ""
+    return config_model_id or "default"
 
 
 def get_device():
@@ -177,6 +197,29 @@ def get_model_info() -> Dict[str, Any]:
         "supported_languages": _supported_languages,
         "language_count": len(_supported_languages),
         "device": _device,
+        "model_id": _model_id,
         "is_ready": is_ready(),
         "initialization_state": _initialization_state
     }
+
+
+def _build_pretrained_kwargs(model_cls, model_id: Optional[str]) -> Dict[str, Any]:
+    if not model_id:
+        return {}
+
+    signature = inspect.signature(model_cls.from_pretrained)
+    for param_name in ("model_id", "model_name", "repo_id", "hf_model_id"):
+        if param_name in signature.parameters:
+            return {param_name: model_id}
+
+    if any(
+        param.kind == inspect.Parameter.VAR_KEYWORD
+        for param in signature.parameters.values()
+    ):
+        return {"model_id": model_id}
+
+    print(
+        "⚠ Model ID override is set but this chatterbox-tts version "
+        "does not accept a model ID; using default weights."
+    )
+    return {}

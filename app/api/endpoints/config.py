@@ -43,7 +43,8 @@ async def get_config():
         model={
             "device": device or "unknown",
             "voice_sample_path": Config.VOICE_SAMPLE_PATH,
-            "model_cache_dir": Config.MODEL_CACHE_DIR
+            "model_cache_dir": Config.MODEL_CACHE_DIR,
+            "model_id": Config.MODEL_ID or "default"
         },
         defaults={
             "exaggeration": Config.EXAGGERATION,
